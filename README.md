@@ -12,6 +12,9 @@ python exp1_dns_anycast/run.py    # ~1 min, needs Internet
 python exp2_algorithms/run.py     # ~10 min, CPU only
 python exp3_hashing/run.py        # ~10 s
 python exp4_mini_lb/run.py        # ~35 s, uses localhost ports 18000-18003
+python exp5_dns_ttl_tls/run.py    # ~2.5 min, needs Internet
+python exp6_lb_features/run.py    # ~1 min, uses localhost ports 18100-18143
+python exp7_packet_capture/run.py # ~30 s, needs Wireshark (tshark) and Npcap with loopback support
 ```
 
 Results are written to [`results/`](results/). Random seeds are fixed, so experiments 2 and 3
@@ -64,12 +67,43 @@ rotation after about 1.1–1.7 s and returned about 1.1–1.3 s after restart; w
 requests failed with 502, with one retry none failed. On Windows a connection to a closed local port
 takes about a second to fail, which also slows the sequential client during the outage.
 
+## 5. DNS caching (TTL) and TLS termination — [`exp5_dns_ttl_tls`](exp5_dns_ttl_tls/run.py)
+
+A small DNS client asks the caching resolver `1.1.1.1` and the authoritative server of `rtu.lv`
+every 20 s. The authoritative answer always has TTL 300 s, while the resolver's TTL counts down
+(116 → 96 → … → 16) and only then is refreshed — until then its clients cannot see changes.
+The TLS certificate for `rtu.lv` is served from a Cloudflare address (issuer Google Trust Services);
+a TLS connection to the same IP without SNI fails, because the proxy needs the site name to pick the
+certificate. [Full results](results/exp5_results.md).
+
+## 6. Sticky sessions, draining and least connections — [`exp6_lb_features`](exp6_lb_features/run.py)
+
+The mini balancer extended with cookie stickiness, draining and least connections
+([full results](results/exp6_results.md)):
+- sticky clients keep their backend; when it fails they are moved, and a newly added backend
+  receives none of the existing clients;
+- removing a backend with 1-second requests in progress: abrupt stop — 8 failed requests,
+  draining — 0;
+- one backend 10× slower: round robin sends it 33 % of requests (mean latency 219 ms),
+  least connections 7 % (103 ms) and serves twice as many requests;
+- long-lived requests and a new empty backend: least connections sends it **all** new requests for
+  about a second ("hammering"), round robin about a third from the start.
+
+## 7. Packet capture with tshark — [`exp7_packet_capture`](exp7_packet_capture/run.py)
+
+Wireshark's command-line tool captures what a balancer sees ([full results](results/exp7_results.md)):
+the DNS response with three A records and their TTL; an L4 health check — `SYN, SYN+ACK, ACK` to a
+live backend and `SYN` answered by `RST` from a stopped one (Windows retries the SYN five times at
+0.5 s intervals, which is why connecting to a dead local port takes about 2 s); and the TLS Client
+Hello where the site name (SNI) `rtu.lv` is visible in clear text. Raw captures are deleted; only
+selected fields without the client's own addresses are kept.
+
 ## Limitations
 
 These are simplified models. The simulation in experiment 2 gives "least connections" exact,
 instantaneous knowledge of every queue, which a real distributed balancer does not have; near
 saturation (load 0.99) very long runs are needed for the averages to converge (section E of the
-results). Experiment 4 uses Python's standard HTTP server and says nothing about the performance
+results). Experiments 4 and 6 use Python's standard HTTP server and says nothing about the performance
 of production balancers.
 
 ## Use of AI tools
