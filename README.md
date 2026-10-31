@@ -1,5 +1,7 @@
 # Load balancing experiments
 
+![Experiment 2: identical servers](results/exp2_identical_servers.png)
+
 Practical experiments for the individual project *"Slodzes balansēšana datoru tīklos"*
 (Load balancing in computer networks), Riga Technical University, course "Datoru tīkli", 2026.
 
