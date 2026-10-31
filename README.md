@@ -1,12 +1,16 @@
 # Load balancing experiments
 
-![Experiment 2: identical servers](results/exp2_identical_servers.png)
+Part of my portfolio: https://ilyaeis.github.io/?go=balancer
+
+![Bar chart: share of keys that move when a server is added or removed. Modulo hashing moves about 80 percent, consistent hashing with virtual nodes about 20, rendezvous and Maglev about 20, which is the ideal.](results/exp3_keys_moved.png)
+
+*Hashing moves few keys only if it is built for it. Modulo moves 4 of 5 keys when one server is added. Rendezvous and Maglev move the ideal 20 %.*
 
 Practical experiments for the individual project *"Slodzes balansēšana datoru tīklos"*
 (Load balancing in computer networks), Riga Technical University, course "Datoru tīkli", 2026.
 
 Everything runs on an ordinary computer with Python 3 and the standard `nslookup` /
-`tracert` (`traceroute`) tools. Only experiment 2 needs `matplotlib` for the chart.
+`tracert` (`traceroute`) tools. Experiment 2 and the charts need `matplotlib`.
 
 ```
 pip install -r requirements.txt
@@ -19,7 +23,12 @@ python exp6_lb_features/run.py    # ~1 min, uses localhost ports 18100-18143
 python exp7_packet_capture/run.py # ~30 s, needs Wireshark (tshark) and Npcap with loopback support
 ```
 
-Results are written to [`results/`](results/). Random seeds are fixed, so experiments 2 and 3
+Results are written to [`results/`](results/). The charts in this README come from those result files:
+`python tools/make_charts.py` redraws them (needs `matplotlib`, runs no experiment).
+
+## How it works
+
+Each `expN_*/run.py` is one self-contained experiment. It prints and saves a Markdown file in `results/`. Simulations (2 and 3) are pure Python. Experiments 4 and 6 start small HTTP servers and a balancer on localhost. Experiments 1, 5 and 7 use the real network. Random seeds are fixed, so experiments 2 and 3
 are reproducible; experiments 1 and 4 depend on the network and the machine.
 
 ## 1. DNS round robin, anycast and CDN on the real Internet — [`exp1_dns_anycast`](exp1_dns_anycast/run.py)
@@ -42,8 +51,11 @@ Main observations ([full results](results/exp1_results.md)), measured from Riga:
 Discrete-event simulation of n FIFO servers with Poisson arrivals, as in Mitzenmacher, Richa &
 Sitaraman, *The Power of Two Random Choices* (2001). Policies: random, round robin, weighted round
 robin, "power of two choices" and least connections (join the shortest queue with exact global
-knowledge). [Full results](results/exp2_results.md), chart:
-[`exp2_identical_servers.png`](results/exp2_identical_servers.png).
+knowledge). [Full results](results/exp2_results.md).
+
+![Line chart, log scale: mean time in system against load for 100 identical servers. Random and round robin grow fast near load 1. Two choices stays low. Least connections is lowest.](results/exp2_mean_time_by_policy.png)
+
+![Experiment 2 chart: identical servers](results/exp2_identical_servers.png)
 
 ## 3. Hashing when servers are added or removed — [`exp3_hashing`](exp3_hashing/run.py)
 
@@ -58,7 +70,7 @@ virtual nodes), rendezvous hashing and Maglev hashing ([full results](results/ex
 | rendezvous (HRW) | 19.9 % | 1.01 |
 | Maglev hashing | 20.1 % | 1.01 |
 
-The ideal is 20 % (only the keys taken over by the new server move).
+The ideal is 20 % (only the keys taken over by the new server move). The chart at the top shows these numbers.
 
 ## 4. Mini load balancer with health checks — [`exp4_mini_lb`](exp4_mini_lb/run.py)
 
@@ -68,6 +80,8 @@ sends 20 requests/s ([full results](results/exp4_results.md)). The dead backend 
 rotation after about 1.1–1.7 s and returned about 1.1–1.3 s after restart; without a retry 2 client
 requests failed with 502, with one retry none failed. On Windows a connection to a closed local port
 takes about a second to fail, which also slows the sequential client during the outage.
+
+![Timeline: backend 2 is stopped at 5 s and restarted at 10 s. Without retry the balancer needs 1.68 s to mark it down and 2 requests fail. With one retry it needs 1.08 s and none fail.](results/exp4_health_check_timeline.png)
 
 ## 5. DNS caching (TTL) and TLS termination — [`exp5_dns_ttl_tls`](exp5_dns_ttl_tls/run.py)
 
